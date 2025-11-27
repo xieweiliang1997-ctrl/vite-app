@@ -1,0 +1,57 @@
+# 流水线名称
+name: 自动构建 Docker 并部署到服务器
+# 触发条件：当代码推送到 main 分支时执行
+on:
+  push:
+    branches: [ main ]
+
+# 定义作业（Job）：在 Ubuntu 云端执行
+jobs:
+  build-and-deploy:
+    runs-on: ubuntu-latest
+    steps:
+      # 步骤 1：拉取 GitHub 仓库代码
+      - name: 拉取代码
+        uses: actions/checkout@v4
+
+      # 步骤 2：登录 Docker Hub（用于推送镜像）
+      - name: 登录 Docker Hub
+        uses: docker/login-action@v3
+        with:
+          username: ${{ secrets.DOCKERHUB_USERNAME }}
+          password: ${{ secrets.DOCKERHUB_TOKEN }}
+
+      # 步骤 3：构建 Docker 镜像并推送到 Docker Hub
+      - name: 构建并推送镜像
+        uses: docker/build-push-action@v5
+        with:
+          context: .  # 构建上下文（当前项目根目录）
+          push: true  # 推送镜像到 Docker Hub
+          tags: |  # 镜像标签（Docker Hub 用户名/仓库名:版本）
+            ${{ secrets.DOCKERHUB_USERNAME }}/vite-app:latest
+            ${{ secrets.DOCKERHUB_USERNAME }}/vite-app:${{ github.sha }}  # 用 Git 提交哈希作为版本（方便回滚）
+
+      # 步骤 4：SSH 连接服务器，拉取镜像并启动容器
+      - name: 部署到服务器
+        uses: appleboy/ssh-action@master  # SSH 连接工具
+        with:
+          host: ${{ secrets.SERVER_HOST }}  # 服务器 IP
+          username: ${{ secrets.SERVER_USER }}  # 服务器用户名
+          key: ${{ secrets.SERVER_SSH_KEY }}  # 服务器 SSH 私钥
+          # 服务器执行的命令（按顺序执行：停止旧容器 → 删除旧容器 → 拉新镜像 → 启动新容器）
+          script: |
+            echo "=== 开始部署 ==="
+            # 停止正在运行的旧容器（若存在）
+            docker stop vite-app || true
+            # 删除旧容器（若存在）
+            docker rm vite-app || true
+            # 拉取最新镜像（从 Docker Hub）
+            docker pull ${{ secrets.DOCKERHUB_USERNAME }}/vite-app:latest
+            # 启动新容器（端口映射 5174:80，自动重启）
+            docker run -d \
+              --name vite-app \
+              --network frontend-backend-network \
+              -p 5174:80 \
+              --restart always \
+              ${{ secrets.DOCKERHUB_USERNAME }}/vite-app:latest
+            echo "=== 部署完成 ==="

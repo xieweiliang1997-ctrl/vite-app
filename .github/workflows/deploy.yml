@@ -29,7 +29,7 @@ jobs:
           push: true  # 推送镜像到 Docker Hub
           tags: |  # 镜像标签（Docker Hub 用户名/仓库名:版本）
             ${{ secrets.DOCKERHUB_USERNAME }}/vite-app:latest
-            ${{ secrets.DOCKERHUB_USERNAME }}/vite-app:${{ github.sha }}  # 用 Git 提交哈希作为版本（方便回滚）
+            ${{ secrets.DOCKERHUB_USERNAME }}/vite-app:${{ github.sha }}
 
       # 步骤 4：SSH 连接服务器，拉取镜像并启动容器
       - name: 部署到服务器

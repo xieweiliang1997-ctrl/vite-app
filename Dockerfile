@@ -1,12 +1,12 @@
 # 多阶段构建：先构建 React 项目，再用 Nginx 部署（减小镜像体积）
-FROM node:18-alpine AS build-stage
+FROM node:22-alpine AS build-stage
 WORKDIR /app
 COPY package*.json ./
 # 国内源加速 npm 安装
 RUN npm install --registry=https://registry.npm.taobao.org
 COPY . .
 # 构建生产环境产物
-CMD [ "npm","run","build" ]
+RUN npm run build
 
 # 部署阶段：使用 Nginx 静态服务器
 FROM nginx:alpine AS production-stage
